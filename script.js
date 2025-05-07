@@ -5,6 +5,7 @@ let items = [];
 let particles = [];
 let score = 0;
 let hitSound;
+let smoothedHands = {};
 
 function preload() {
   bodyPose = ml5.bodyPose("BlazePose");
@@ -24,7 +25,11 @@ function setup() {
 
 function draw() {
   background(0);
+  push();
+  translate(width, 0);
+  scale(-1, 1);
   image(video, 0, 0, width, height);
+  pop();
   drawItems();
   drawHands();
   drawParticles();
@@ -45,11 +50,7 @@ function drawItems() {
   for (let i = items.length - 1; i >= 0; i--) {
     let item = items[i];
     item.y += item.speed;
-    if (item.hit) {
-      fill(0, 255, 0); // Turn green if hit
-    } else {
-      fill(255, 204, 0); // Yellow by default
-    }
+    fill(item.hit ? color(0, 255, 0) : color(255, 204, 0));
     noStroke();
     ellipse(item.x, item.y, item.size);
 
@@ -58,22 +59,21 @@ function drawItems() {
     }
 
     for (let pose of poses) {
-      let leftWrist = pose.keypoints.find((p) => p.name === "left_wrist");
-      let rightWrist = pose.keypoints.find((p) => p.name === "right_wrist");
-
-      let hands = [leftWrist, rightWrist];
+      let leftHand = getSmoothedHand(pose, "left");
+      let rightHand = getSmoothedHand(pose, "right");
+      let hands = [leftHand, rightHand];
 
       for (let hand of hands) {
-        if (hand && hand.confidence > 0.1) {
-          let boxSize = 30;
+        if (hand && hand.confidence > 0.5) {
+          let boxSize = hand.size;
           rectMode(CENTER);
           noFill();
           stroke(0, 255, 0);
           strokeWeight(2);
-          rect(hand.x, hand.y, boxSize, boxSize);
+          rect(width - hand.x, hand.y, boxSize, boxSize);
 
           // Check for collision
-          if (!item.hit && dist(hand.x, hand.y, item.x, item.y) < item.size / 2 + boxSize / 2) {
+          if (!item.hit && dist(width - hand.x, hand.y, item.x, item.y) < item.size / 2 + boxSize / 2) {
             item.hit = true;
             score += 1;
             document.getElementById("score").textContent = `Score: ${score}`;
@@ -89,19 +89,46 @@ function drawItems() {
 
 function drawHands() {
   for (let pose of poses) {
-    let leftWrist = pose.keypoints.find((p) => p.name === "left_wrist");
-    let rightWrist = pose.keypoints.find((p) => p.name === "right_wrist");
-
-    let hands = [leftWrist, rightWrist];
+    let leftHand = getSmoothedHand(pose, "left");
+    let rightHand = getSmoothedHand(pose, "right");
+    let hands = [leftHand, rightHand];
 
     for (let hand of hands) {
-      if (hand && hand.confidence > 0.1) {
-        fill(0, 255, 0);
+      if (hand && hand.confidence > 0.5) {
+        fill(0, 255, 0, 100);
         noStroke();
-        circle(hand.x, hand.y, 10);
+        ellipse(width - hand.x, hand.y, hand.size, hand.size);
       }
     }
   }
+}
+
+function getSmoothedHand(pose, side) {
+  const wristName = side === "left" ? "left_wrist" : "right_wrist";
+  const indexBaseName = side === "left" ? "left_index" : "right_index";
+  const pinkyBaseName = side === "left" ? "left_pinky" : "right_pinky";
+  const wrist = getKeypoint(pose, wristName);
+  const indexBase = getKeypoint(pose, indexBaseName);
+  const pinkyBase = getKeypoint(pose, pinkyBaseName);
+
+  if (wrist && indexBase && pinkyBase) {
+    const centerX = (wrist.x + indexBase.x + pinkyBase.x) / 3;
+    const centerY = (wrist.y + indexBase.y + pinkyBase.y) / 3;
+    const size = dist(indexBase.x, indexBase.y, pinkyBase.x, pinkyBase.y) * 2;
+
+    // Smooth position and size
+    if (!smoothedHands[side]) smoothedHands[side] = { x: centerX, y: centerY, size: size };
+    smoothedHands[side].x = lerp(smoothedHands[side].x, centerX, 0.2);
+    smoothedHands[side].y = lerp(smoothedHands[side].y, centerY, 0.2);
+    smoothedHands[side].size = lerp(smoothedHands[side].size, size, 0.2);
+
+    return { x: smoothedHands[side].x, y: smoothedHands[side].y, size: smoothedHands[side].size, confidence: wrist.confidence };
+  }
+  return null;
+}
+
+function getKeypoint(pose, partName) {
+  return pose.keypoints.find((k) => k.name === partName);
 }
 
 function spawnParticles(x, y) {
