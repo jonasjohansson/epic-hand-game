@@ -1,0 +1,17 @@
+body {
+  margin: 0;
+  overflow: hidden;
+  background-color: #222;
+  color: #fff;
+  font-family: Arial, sans-serif;
+}
+#score {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 18px;
+  color: #fff;
+}
