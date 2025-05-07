@@ -7,7 +7,7 @@ let score = 0;
 let hitSound;
 
 function preload() {
-  bodyPose = ml5.bodyPose();
+  bodyPose = ml5.bodyPose("BlazePose");
   hitSound = loadSound("Pickup 2.wav");
 }
 
@@ -95,7 +95,7 @@ function drawHands() {
     let hands = [leftWrist, rightWrist];
 
     for (let hand of hands) {
-      if (hand && hand.confidence > 0.5) {
+      if (hand && hand.confidence > 0.1) {
         fill(0, 255, 0);
         noStroke();
         circle(hand.x, hand.y, 10);
